@@ -1,139 +1,106 @@
 import 'package:flutter/material.dart';
-import '../data.dart';
+import 'package:ukk_paket4/database/database.dart';
 import 'pengajuan_peminjaman.dart';
 
 class SearchBuku extends StatefulWidget {
-  const SearchBuku({super.key});
+  final int userId;
+  const SearchBuku({super.key, required this.userId});
 
   @override
   State<SearchBuku> createState() => _SearchBukuState();
 }
 
 class _SearchBukuState extends State<SearchBuku> {
-  final TextEditingController searchController = TextEditingController();
-  List<Map<String, dynamic>> searchResults = [];
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _isLoading = false;
 
-  final Color primaryColor = const Color(0xFF6C63FF);
-  final Color bgColor = const Color(0xFFF4F3FD);
+  final Color primaryBlue = const Color(0xFF1E3A8A);
 
-  void searchBooks(String query) {
+  void _onSearch(String query) async {
+    if (query.isEmpty) {
+      setState(() => _searchResults = []);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    final db = await DatabaseHelper.instance.database;
+    
+    // Mencari berdasarkan judul buku di database Admin
+    final data = await db.query(
+      'buku',
+      where: 'judul LIKE ?',
+      whereArgs: ['%$query%'],
+    );
+
     setState(() {
-      if (query.isEmpty) {
-        searchResults = [];
-      } else {
-        searchResults = books
-            .where((book) =>
-                book['judul'].toLowerCase().contains(query.toLowerCase()))
-            .toList();
-      }
+      _searchResults = data;
+      _isLoading = false;
     });
   }
-
-  void pinjamBuku(String judul) {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => PengajuanPeminjaman(
-        userId: 1, 
-        selectedBook: judul,
-      ),
-    ),
-  );
-}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: searchController,
-              onChanged: searchBooks,
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: primaryBlue,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text("Cari Buku", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: primaryBlue,
+            child: TextField(
+              controller: _searchController,
+              onChanged: _onSearch,
+              autofocus: true,
               decoration: InputDecoration(
-                hintText: "Cari judul buku...",
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.grey),
-                ),
+                hintText: "Masukkan judul buku...",
+                prefixIcon: const Icon(Icons.search_rounded),
                 filled: true,
                 fillColor: Colors.white,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
             ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: searchResults.isEmpty
-                  ? Center(
-                      child: Text(
-                        searchController.text.isEmpty
-                            ? "Mulai mengetik untuk mencari buku"
-                            : "Tidak ada hasil pencarian",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: searchResults.length,
-                      itemBuilder: (context, index) {
-                        return Card(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            leading: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.asset(
-                                searchResults[index]['gambar'],
-                                width: 50,
-                                height: 70,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    width: 50,
-                                    height: 70,
-                                    color: Colors.grey[300],
-                                    child: const Icon(Icons.book),
-                                  );
+          ),
+          Expanded(
+            child: _isLoading
+                ? Center(child: CircularProgressIndicator(color: primaryBlue))
+                : _searchResults.isEmpty && _searchController.text.isNotEmpty
+                    ? const Center(child: Text("Buku tidak ditemukan."))
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(15),
+                        itemCount: _searchResults.length,
+                        itemBuilder: (context, index) {
+                          final buku = _searchResults[index];
+                          return Card(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                            child: ListTile(
+                              leading: Icon(Icons.menu_book_rounded, color: primaryBlue),
+                              title: Text(buku['judul'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(buku['pengarang']),
+                              trailing: IconButton(
+                                icon: Icon(Icons.add_circle_outline, color: primaryBlue),
+                                onPressed: () {
+                                  Navigator.push(context, MaterialPageRoute(
+                                    builder: (_) => PengajuanPeminjaman(
+                                      userId: widget.userId, 
+                                      selectedBook: buku['judul']
+                                    )
+                                  ));
                                 },
                               ),
                             ),
-                            title: Text(
-                              searchResults[index]['judul'],
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Text(
-                                "Status: ${searchResults[index]['status']}"),
-                            trailing: ElevatedButton.icon(
-                              onPressed: () =>
-                                  pinjamBuku(searchResults[index]['judul']),
-                              icon: const Icon(Icons.add, size: 18),
-                              label: const Text("Pinjam"),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryColor,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
+                          );
+                        },
+                      ),
+          ),
+        ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
   }
 }

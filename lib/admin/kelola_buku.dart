@@ -11,6 +11,8 @@ class KelolaBuku extends StatefulWidget {
 class _KelolaBukuState extends State<KelolaBuku> {
   final TextEditingController _judulController = TextEditingController();
   final TextEditingController _penulisController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
+  
   List<Map<String, dynamic>> _listBuku = [];
   bool _isLoading = true;
   
@@ -23,10 +25,23 @@ class _KelolaBukuState extends State<KelolaBuku> {
     _loadBooks();
   }
 
-  Future<void> _loadBooks() async {
+  // SEARCH LANGSUNG KE DATABASE
+  Future<void> _loadBooks({String query = ""}) async {
     setState(() => _isLoading = true);
     final db = await DatabaseHelper.instance.database;
-    final data = await db.query('buku', orderBy: 'id DESC');
+    
+    List<Map<String, dynamic>> data;
+    if (query.isEmpty) {
+      data = await db.query('buku', orderBy: 'id DESC');
+    } else {
+      data = await db.query(
+        'buku',
+        where: 'judul LIKE ? OR pengarang LIKE ?',
+        whereArgs: ['%$query%', '%$query%'],
+        orderBy: 'id DESC',
+      );
+    }
+
     setState(() {
       _listBuku = data;
       _isLoading = false;
@@ -39,7 +54,7 @@ class _KelolaBukuState extends State<KelolaBuku> {
     await db.insert('buku', {
       'judul': _judulController.text,
       'pengarang': _penulisController.text,
-      'stok': 10,
+      'stok': 1 // Default stok
     });
     _judulController.clear();
     _penulisController.clear();
@@ -59,50 +74,43 @@ class _KelolaBukuState extends State<KelolaBuku> {
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: primaryBlue,
-        elevation: 0,
-        title: const Text("Daftar Buku", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text("Kelola Koleksi Buku", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _tambahBukuDialog,
-        backgroundColor: primaryBlue,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
-      body: _isLoading 
-        ? Center(child: CircularProgressIndicator(color: primaryBlue))
-        : Column(
-            children: [
-              Container(
-                height: 40,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: primaryBlue,
-                  borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
-                ),
+      body: Column(
+        children: [
+          // SEARCH BAR
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: primaryBlue,
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) => _loadBooks(query: value),
+              decoration: InputDecoration(
+                hintText: "Cari judul atau penulis...",
+                prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
               ),
-              Expanded(
-                child: _listBuku.isEmpty 
-                ? const Center(child: Text("Koleksi masih kosong"))
+            ),
+          ),
+          
+          Expanded(
+            child: _isLoading
+                ? Center(child: CircularProgressIndicator(color: primaryBlue))
                 : ListView.builder(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(15),
                     itemCount: _listBuku.length,
                     itemBuilder: (context, index) {
                       final buku = _listBuku[index];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 15),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15, offset: const Offset(0, 5))],
-                        ),
+                      return Card(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        margin: const EdgeInsets.only(bottom: 10),
                         child: ListTile(
-                          contentPadding: const EdgeInsets.all(12),
-                          leading: Container(
-                            width: 50, height: 50,
-                            decoration: BoxDecoration(color: lightBlue, borderRadius: BorderRadius.circular(12)),
-                            child: Icon(Icons.menu_book_rounded, color: primaryBlue),
-                          ),
+                          leading: CircleAvatar(backgroundColor: lightBlue, child: Icon(Icons.book, color: primaryBlue)),
                           title: Text(buku['judul'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(buku['pengarang'], style: TextStyle(color: Colors.grey[600])),
+                          subtitle: Text(buku['pengarang']),
                           trailing: IconButton(
                             icon: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent),
                             onPressed: () => _hapusBuku(buku['id']),
@@ -111,9 +119,14 @@ class _KelolaBukuState extends State<KelolaBuku> {
                       );
                     },
                   ),
-              ),
-            ],
           ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: primaryBlue,
+        onPressed: _tambahBukuDialog,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 
@@ -121,8 +134,7 @@ class _KelolaBukuState extends State<KelolaBuku> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Tambah Buku Baru"),
+        title: const Text("Tambah Buku"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -132,11 +144,7 @@ class _KelolaBukuState extends State<KelolaBuku> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
-          ElevatedButton(
-            onPressed: _simpanBuku,
-            style: ElevatedButton.styleFrom(backgroundColor: primaryBlue),
-            child: const Text("Simpan"),
-          ),
+          ElevatedButton(onPressed: _simpanBuku, child: const Text("Simpan")),
         ],
       ),
     );

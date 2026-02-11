@@ -11,7 +11,10 @@ class KelolaAnggota extends StatefulWidget {
 class _KelolaAnggotaState extends State<KelolaAnggota> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  final searchController = TextEditingController();
+  
   List<Map<String, dynamic>> _users = [];
+  bool _isLoading = false;
   
   final Color primaryBlue = const Color(0xFF1E3A8A);
   final Color lightBlue = const Color(0xFFDBEAFE);
@@ -22,10 +25,26 @@ class _KelolaAnggotaState extends State<KelolaAnggota> {
     _loadUsers();
   }
 
-  void _loadUsers() async {
+  // SEARCH USER DARI DATABASE
+  void _loadUsers({String query = ""}) async {
+    setState(() => _isLoading = true);
     final db = await DatabaseHelper.instance.database;
-    final data = await db.query('users', where: 'is_admin = ?', whereArgs: [0]);
-    setState(() => _users = data);
+    
+    List<Map<String, dynamic>> data;
+    if (query.isEmpty) {
+      data = await db.query('users', where: 'is_admin = ?', whereArgs: [0]);
+    } else {
+      data = await db.query(
+        'users',
+        where: 'is_admin = ? AND email LIKE ?',
+        whereArgs: [0, '%$query%'],
+      );
+    }
+    
+    setState(() {
+      _users = data;
+      _isLoading = false;
+    });
   }
 
   void _tambahUser() async {
@@ -39,7 +58,6 @@ class _KelolaAnggotaState extends State<KelolaAnggota> {
     emailController.clear();
     passwordController.clear();
     _loadUsers();
-    FocusScope.of(context).unfocus();
   }
 
   void _hapusUser(int id) async {
@@ -54,91 +72,66 @@ class _KelolaAnggotaState extends State<KelolaAnggota> {
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: primaryBlue,
-        elevation: 0,
-        title: const Text("Kelola Anggota", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text("Kelola Anggota", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
       body: Column(
         children: [
-          // Form Input Area
+          // SEARCH USER BAR
           Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: primaryBlue,
-              borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
+            padding: const EdgeInsets.all(16),
+            color: primaryBlue,
+            child: TextField(
+              controller: searchController,
+              onChanged: (value) => _loadUsers(query: value),
+              decoration: InputDecoration(
+                hintText: "Cari email anggota...",
+                prefixIcon: const Icon(Icons.person_search, color: Colors.grey),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+              ),
             ),
-            child: Column(
-              children: [
-                TextField(
-                  controller: emailController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: "Email Anggota",
-                    hintStyle: const TextStyle(color: Colors.white70),
-                    prefixIcon: const Icon(Icons.email, color: Colors.white70),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: passwordController,
-                  obscureText: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: "Password",
-                    hintStyle: const TextStyle(color: Colors.white70),
-                    prefixIcon: const Icon(Icons.lock, color: Colors.white70),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                  ),
-                ),
-                const SizedBox(height: 15),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: _tambahUser,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: primaryBlue,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          ),
+
+          // INPUT TAMBAH USER (Design Baru)
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    TextField(controller: emailController, decoration: const InputDecoration(labelText: "Email Baru", prefixIcon: Icon(Icons.email_outlined))),
+                    TextField(controller: passwordController, decoration: const InputDecoration(labelText: "Password", prefixIcon: Icon(Icons.lock_outline))),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: primaryBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                        onPressed: _tambahUser, 
+                        child: const Text("Daftarkan Anggota Baru", style: TextStyle(color: Colors.white)),
+                      ),
                     ),
-                    child: const Text("Daftarkan Anggota Baru", style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-          
-          const SizedBox(height: 20),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Align(alignment: Alignment.centerLeft, child: Text("Daftar Anggota Aktif", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-          ),
-          
+
           Expanded(
-            child: _users.isEmpty 
-            ? Center(child: Text("Belum ada anggota", style: TextStyle(color: Colors.grey[400])))
+            child: _isLoading 
+            ? Center(child: CircularProgressIndicator(color: primaryBlue))
             : ListView.builder(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: _users.length,
-                itemBuilder: (context, i) => Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
-                  ),
+                itemBuilder: (context, i) => Card(
+                  margin: const EdgeInsets.only(bottom: 10),
                   child: ListTile(
                     leading: CircleAvatar(backgroundColor: lightBlue, child: Icon(Icons.person, color: primaryBlue)),
                     title: Text(_users[i]['email'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text("Status: Anggota Aktif", style: TextStyle(fontSize: 12)),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                      onPressed: () => _hapusUser(_users[i]['id']),
-                    ),
+                    trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => _hapusUser(_users[i]['id'])),
                   ),
                 ),
               ),
