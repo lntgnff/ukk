@@ -44,12 +44,6 @@ class _SearchBukuState extends State<SearchBuku> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: primaryColor,
-        elevation: 0,
-        title: const Text("Cari Buku"),
-      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

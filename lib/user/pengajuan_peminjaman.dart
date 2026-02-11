@@ -162,7 +162,7 @@ class _PengajuanPeminjamanState extends State<PengajuanPeminjaman> {
                   height: 50,
                   child: ElevatedButton(
                     onPressed: _kirimPengajuan,
-                    style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
                     child: const Text("AJUKAN SEKARANG", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 )
