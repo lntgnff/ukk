@@ -17,9 +17,10 @@ class UserHome extends StatefulWidget {
 class _UserHomeState extends State<UserHome> {
   int currentIndex = 0;
   
-  final Color primaryBlue = const Color(0xFF1E3A8A);
-  final Color lightBlue = const Color(0xFFDBEAFE); 
-  final Color accentBlue = const Color(0xFF3B82F6);  
+  // PALET WARNA BIRU ADMIN (NUANSA ELEGAN)
+  final Color primaryBlue = const Color(0xFF1E3A8A); // Royal Blue
+  final Color accentBlue = const Color(0xFF3B82F6);  // Biru Terang
+  final Color softBlue = const Color(0xFFEFF6FF);    // Background Biru Sangat Muda
 
   List<Map<String, dynamic>> rekomendasiBuku = [];
   List<Map<String, dynamic>> bukuDipinjam = [];
@@ -31,24 +32,19 @@ class _UserHomeState extends State<UserHome> {
   }
 
   Future<void> _loadData() async {
-    try {
-      final db = await DatabaseHelper.instance.database;
-      final listBuku = await db.query('buku', limit: 10);
-      final listPinjam = await db.rawQuery('''
-        SELECT t.id as transaksi_id, b.judul, t.tanggal_pinjam 
-        FROM transaksi t 
-        JOIN buku b ON t.buku_id = b.id 
-        WHERE t.user_id = ? AND t.status = 'Disetujui'
-      ''', [widget.userId]);
+    final db = await DatabaseHelper.instance.database;
+    final listBuku = await db.query('buku', limit: 10);
+    final listPinjam = await db.rawQuery('''
+      SELECT t.id, b.judul, t.tanggal_pinjam 
+      FROM transaksi t 
+      JOIN buku b ON t.buku_id = b.id 
+      WHERE t.user_id = ? AND t.status = 'Disetujui'
+    ''', [widget.userId]);
 
-      if (!mounted) return;
-      setState(() {
-        rekomendasiBuku = List<Map<String, dynamic>>.from(listBuku);
-        bukuDipinjam = List<Map<String, dynamic>>.from(listPinjam);
-      });
-    } catch (e) {
-      print("ERROR: $e");
-    }
+    setState(() {
+      rekomendasiBuku = listBuku;
+      bukuDipinjam = listPinjam;
+    });
   }
 
   @override
@@ -64,28 +60,25 @@ class _UserHomeState extends State<UserHome> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: primaryBlue,
-        title: const Text("Perpustakaan Digital", 
-          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.white)),
+        title: const Text("DIGI-LIB", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+        centerTitle: true,
         actions: [
           IconButton(
-            onPressed: () => Navigator.pushReplacement(
-                context, MaterialPageRoute(builder: (_) => const LoginPage())),
             icon: const Icon(Icons.logout_rounded),
+            onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage())),
           )
         ],
       ),
       body: pages[currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
-        onTap: (index) => setState(() => currentIndex = index),
         selectedItemColor: primaryBlue,
         unselectedItemColor: Colors.grey,
-        showUnselectedLabels: false,
-        type: BottomNavigationBarType.fixed,
+        onTap: (index) => setState(() => currentIndex = index),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: "Beranda"),
-          BottomNavigationBarItem(icon: Icon(Icons.search_rounded), label: "Cari"),
-          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: "Profil"),
+          BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Beranda"),
+          BottomNavigationBarItem(icon: Icon(Icons.search), label: "Cari"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profil"),
         ],
       ),
     );
@@ -93,124 +86,142 @@ class _UserHomeState extends State<UserHome> {
 
   Widget _buildHomeContent() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // HEADER BANNER BIRU
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: primaryBlue,
+              borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Sedang Dipinjam",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-                if (bukuDipinjam.isNotEmpty)
-                  Text("${bukuDipinjam.length} Buku", style: TextStyle(color: accentBlue, fontWeight: FontWeight.w600)),
+                const Text("Temukan Pengetahuan,", style: TextStyle(color: Colors.white70, fontSize: 16)),
+                const Text("Ayo Membaca Hari Ini!", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                // SEARCH BAR SIMULASI
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 15),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+                  child: TextField(
+                    readOnly: true,
+                    onTap: () => setState(() => currentIndex = 1),
+                    decoration: const InputDecoration(hintText: "Cari judul buku...", border: InputBorder.none, icon: Icon(Icons.search)),
+                  ),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+
+          const SizedBox(height: 25),
+
+          // SEKSI BUKU DIPINJAM (HORIZONTAL)
+          _sectionTitle("Pinjaman Aktif"),
+          const SizedBox(height: 10),
           bukuDipinjam.isEmpty
-              ? _buildEmptyState("Tidak ada pinjaman aktif")
+              ? _buildEmptyState("Kamu tidak memiliki pinjaman aktif")
               : SizedBox(
                   height: 100,
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     scrollDirection: Axis.horizontal,
                     itemCount: bukuDipinjam.length,
-                    itemBuilder: (context, index) {
-                      return Container(
-                        width: 280,
-                        margin: const EdgeInsets.only(right: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: lightBlue),
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          leading: CircleAvatar(
-                            backgroundColor: lightBlue,
-                            child: Icon(Icons.bookmark, color: primaryBlue),
-                          ),
-                          title: Text(bukuDipinjam[index]['judul'], 
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text("Pinjam: ${bukuDipinjam[index]['tanggal_pinjam']}", style: const TextStyle(fontSize: 12)),
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistoryPeminjaman(userId: widget.userId))),
-                        ),
-                      );
-                    },
+                    itemBuilder: (context, index) => _buildCardPinjam(bukuDipinjam[index]),
                   ),
                 ),
 
-          const SizedBox(height: 30),
+          const SizedBox(height: 25),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: const Text("Katalog Buku",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+          // SEKSI DAFTAR BUKU
+          _sectionTitle("Rekomendasi Buku"),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            itemCount: rekomendasiBuku.length,
+            itemBuilder: (context, index) => _buildBookItem(rekomendasiBuku[index]),
           ),
-          const SizedBox(height: 15),
-          rekomendasiBuku.isEmpty
-              ? _buildEmptyState("Buku tidak tersedia")
-              : ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: rekomendasiBuku.length,
-                  itemBuilder: (context, index) {
-                    final buku = rekomendasiBuku[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(12),
-                        leading: Container(
-                          width: 50, height: 70,
-                          decoration: BoxDecoration(
-                            color: lightBlue,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(Icons.menu_book_rounded, color: primaryBlue),
-                        ),
-                        title: Text(buku['judul'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(buku['pengarang'] ?? '-', style: TextStyle(color: Colors.grey[600])),
-                        trailing: ElevatedButton(
-                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PengajuanPeminjaman(userId: widget.userId, selectedBook: buku['judul']))),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryBlue,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            elevation: 0,
-                          ),
-                          child: const Text("Pinjam"),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _buildCardPinjam(Map<String, dynamic> data) {
+    return Container(
+      width: 260,
+      margin: const EdgeInsets.only(right: 15),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: softBlue, width: 2),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.auto_stories, color: accentBlue),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(data['judul'], style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text("Pinjam: ${data['tanggal_pinjam']}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBookItem(Map<String, dynamic> buku) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 50, height: 50,
+            decoration: BoxDecoration(color: softBlue, borderRadius: BorderRadius.circular(10)),
+            child: Icon(Icons.book, color: primaryBlue),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(buku['judul'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(buku['pengarang'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PengajuanPeminjaman(userId: widget.userId, selectedBook: buku['judul']))),
+            style: ElevatedButton.styleFrom(backgroundColor: primaryBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            child: const Text("Pinjam"),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildEmptyState(String msg) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(Icons.inbox_rounded, size: 40, color: Colors.grey[300]),
-            const SizedBox(height: 8),
-            Text(msg, style: TextStyle(color: Colors.grey[400])),
-          ],
-        ),
-      ),
-    );
+    return Center(child: Text(msg, style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)));
   }
 }
