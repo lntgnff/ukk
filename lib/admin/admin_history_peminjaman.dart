@@ -46,7 +46,6 @@ class _AdminHistoryPeminjamanState extends State<AdminHistoryPeminjaman> with Si
     }
   }
 
-  // FUNGSI UNTUK GENERATE PDF
   Future<void> _generatePdf() async {
     final pdf = pw.Document();
 

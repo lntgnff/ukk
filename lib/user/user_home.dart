@@ -16,7 +16,11 @@ class UserHome extends StatefulWidget {
 
 class _UserHomeState extends State<UserHome> {
   int currentIndex = 0;
-  final Color primaryColor = const Color(0xFF6C63FF);
+  
+  final Color primaryBlue = const Color(0xFF1E3A8A);
+  final Color lightBlue = const Color(0xFFDBEAFE); 
+  final Color accentBlue = const Color(0xFF3B82F6);  
+
   List<Map<String, dynamic>> rekomendasiBuku = [];
   List<Map<String, dynamic>> bukuDipinjam = [];
 
@@ -26,44 +30,25 @@ class _UserHomeState extends State<UserHome> {
     _loadData();
   }
 
-Future<void> _loadData() async {
-  try {
-    final db = await DatabaseHelper.instance.database;
+  Future<void> _loadData() async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final listBuku = await db.query('buku', limit: 10);
+      final listPinjam = await db.rawQuery('''
+        SELECT t.id as transaksi_id, b.judul, t.tanggal_pinjam 
+        FROM transaksi t 
+        JOIN buku b ON t.buku_id = b.id 
+        WHERE t.user_id = ? AND t.status = 'Disetujui'
+      ''', [widget.userId]);
 
-    final listBuku = await db.query('buku', limit: 10);
-    final listPinjam = await db.rawQuery('''
-      SELECT t.id as transaksi_id, b.judul, t.tanggal_pinjam 
-      FROM transaksi t 
-      JOIN buku b ON t.buku_id = b.id 
-      WHERE t.user_id = ? AND t.status = 'Disetujui'
-    ''', [widget.userId]);
-
-    if (!mounted) return;
-
-    setState(() {
-      rekomendasiBuku = List<Map<String, dynamic>>.from(listBuku);
-      bukuDipinjam = List<Map<String, dynamic>>.from(listPinjam);
-    });
-
-    print("Buku loaded: ${rekomendasiBuku.length}");
-  } catch (e) {
-    print("ERROR LOAD DATA: $e");
-  }
-}
-
-  void kembalikanBuku(int transaksiId) async {
-    final db = await DatabaseHelper.instance.database;
-    await db.update(
-      'transaksi',
-      {'status': 'Kembali', 'tanggal_kembali': DateTime.now().toString()},
-      where: 'id = ?',
-      whereArgs: [transaksiId],
-    );
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Buku berhasil dikembalikan!")),
-    );
-    _loadData(); 
+      if (!mounted) return;
+      setState(() {
+        rekomendasiBuku = List<Map<String, dynamic>>.from(listBuku);
+        bukuDipinjam = List<Map<String, dynamic>>.from(listPinjam);
+      });
+    } catch (e) {
+      print("ERROR: $e");
+    }
   }
 
   @override
@@ -75,14 +60,17 @@ Future<void> _loadData() async {
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F3FD),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: primaryColor,
-        title: const Text("Perpustakaan Digital"),
+        elevation: 0,
+        backgroundColor: primaryBlue,
+        title: const Text("Perpustakaan Digital", 
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.white)),
         actions: [
           IconButton(
-            onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage())),
-            icon: const Icon(Icons.logout),
+            onPressed: () => Navigator.pushReplacement(
+                context, MaterialPageRoute(builder: (_) => const LoginPage())),
+            icon: const Icon(Icons.logout_rounded),
           )
         ],
       ),
@@ -90,11 +78,14 @@ Future<void> _loadData() async {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
         onTap: (index) => setState(() => currentIndex = index),
-        selectedItemColor: primaryColor,
+        selectedItemColor: primaryBlue,
+        unselectedItemColor: Colors.grey,
+        showUnselectedLabels: false,
+        type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Beranda"),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: "Cari"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profil"),
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: "Beranda"),
+          BottomNavigationBarItem(icon: Icon(Icons.search_rounded), label: "Cari"),
+          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: "Profil"),
         ],
       ),
     );
@@ -102,108 +93,123 @@ Future<void> _loadData() async {
 
   Widget _buildHomeContent() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Halo User #${widget.userId},", style: const TextStyle(fontSize: 16)),
-          const Text("Mau baca apa hari ini?", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
-
-const Text("Buku Sedang Dipinjam", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-const SizedBox(height: 10),
-bukuDipinjam.isEmpty 
-  ? const Text("Tidak ada buku yang sedang dipinjam.")
-  : Column(
-      children: bukuDipinjam.map((buku) => Card(
-        margin: const EdgeInsets.only(bottom: 10),
-        child: ListTile(
-          leading: const Icon(Icons.book, color: Colors.orange),
-          title: Text(buku['judul']),
-          subtitle: Text("Dipinjam: ${buku['tanggal_pinjam']}"),
-          trailing: TextButton(
-            onPressed: () {
-              Navigator.push(
-                context, 
-                MaterialPageRoute(builder: (_) => HistoryPeminjaman(userId: widget.userId))
-              );
-            },
-            child: const Text("Lihat Riwayat"),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Sedang Dipinjam",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                if (bukuDipinjam.isNotEmpty)
+                  Text("${bukuDipinjam.length} Buku", style: TextStyle(color: accentBlue, fontWeight: FontWeight.w600)),
+              ],
+            ),
           ),
-        ),
-      )).toList(),
-    ),
-          const SizedBox(height: 25),
-
-const Text(
-  "Rekomendasi Untukmu",
-  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-),
-const SizedBox(height: 10),
-
-rekomendasiBuku.isEmpty
-    ? const Text("Belum ada buku tersedia.")
-    : SizedBox(
-        height: 200,
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          itemCount: rekomendasiBuku.length,
-          itemBuilder: (context, index) {
-            final buku = rekomendasiBuku[index];
-
-            return Container(
-              width: 140,
-              margin: const EdgeInsets.only(right: 15),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 5,
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.menu_book, size: 50, color: primaryColor),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(
-                      buku['judul']?.toString() ?? '-',
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Text(
-                    buku['pengarang']?.toString() ?? '',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PengajuanPeminjaman(
-                            userId: widget.userId,
-                            selectedBook: buku['judul']?.toString() ?? '',
+          const SizedBox(height: 12),
+          bukuDipinjam.isEmpty
+              ? _buildEmptyState("Tidak ada pinjaman aktif")
+              : SizedBox(
+                  height: 100,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: bukuDipinjam.length,
+                    itemBuilder: (context, index) {
+                      return Container(
+                        width: 280,
+                        margin: const EdgeInsets.only(right: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: lightBlue),
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          leading: CircleAvatar(
+                            backgroundColor: lightBlue,
+                            child: Icon(Icons.bookmark, color: primaryBlue),
                           ),
+                          title: Text(bukuDipinjam[index]['judul'], 
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text("Pinjam: ${bukuDipinjam[index]['tanggal_pinjam']}", style: const TextStyle(fontSize: 12)),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistoryPeminjaman(userId: widget.userId))),
                         ),
                       );
                     },
-                    child: const Text("Pinjam"),
                   ),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
+                ),
 
+          const SizedBox(height: 30),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: const Text("Katalog Buku",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+          ),
+          const SizedBox(height: 15),
+          rekomendasiBuku.isEmpty
+              ? _buildEmptyState("Buku tidak tersedia")
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: rekomendasiBuku.length,
+                  itemBuilder: (context, index) {
+                    final buku = rekomendasiBuku[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(12),
+                        leading: Container(
+                          width: 50, height: 70,
+                          decoration: BoxDecoration(
+                            color: lightBlue,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.menu_book_rounded, color: primaryBlue),
+                        ),
+                        title: Text(buku['judul'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(buku['pengarang'] ?? '-', style: TextStyle(color: Colors.grey[600])),
+                        trailing: ElevatedButton(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PengajuanPeminjaman(userId: widget.userId, selectedBook: buku['judul']))),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryBlue,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                          child: const Text("Pinjam"),
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String msg) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Icon(Icons.inbox_rounded, size: 40, color: Colors.grey[300]),
+            const SizedBox(height: 8),
+            Text(msg, style: TextStyle(color: Colors.grey[400])),
+          ],
+        ),
       ),
     );
   }
